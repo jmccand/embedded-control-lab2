@@ -1,7 +1,7 @@
 ////////////////////////////////////////////////////////////////////////
 //** ENGR-2350 Template Project 
 //** NAME: Joel McCandless and Jeremy Goldberger
-//** RIN: 662056597 and 
+//** RIN: 662056597 and 662060308
 //** This is the base project for several activities and labs throughout
 //** the course.  The outline provided below isn't necessarily *required*
 //** by a C program; however, this format is required within ENGR-2350
@@ -13,14 +13,14 @@
 #include "engr2350_msp432.h"
 #include <stdlib.h>
 
-#define BPM_LEN 6
+#define BMP_LEN 6
 
 // Add function prototypes here as needed.
 void GPIO_init(void);
 void Timer_init(void);
 void Timer_ISR(void);
 int8_t bumper_pressed(void);
-void set_LED_color(u_int8_t color);
+void set_LED_color(uint8_t color);
 void LED_off(void);
 bool PB_pressed(void);
 void main_game(void);
@@ -31,10 +31,10 @@ void wait(uint8_t periods);
 
 // Add global variables here as needed.
 Timer_A_UpModeConfig config;
-const uint_fast16_t PIN_BMP[] = {GPIO_PIN0, GPIO_PIN2, GPIO_PIN3, GPIO_PIN5, GPIO_PIN6, GPIO_PIN7};
-const uint8_t COLORS[][] = {{0,0,1}, {0,1,0}, {0,1,1}, {1,0,0}, {1,0,1}, {1,1,0}};
-const uint8_t sequence[10];
-uint8_t counter = 0;
+const uint_fast16_t BMP_PINS[] = {GPIO_PIN0, GPIO_PIN2, GPIO_PIN3, GPIO_PIN5, GPIO_PIN6, GPIO_PIN7};
+const uint8_t COLORS[6][3] = {{0,0,1}, {0,1,0}, {0,1,1}, {1,0,0}, {1,0,1}, {1,1,0}};
+uint8_t sequence[10];
+volatile uint8_t counter = 0;
 
 int main( void ) {    /** Main Function ****/
   
@@ -47,17 +47,20 @@ int main( void ) {    /** Main Function ****/
     Timer_init();
 
     // Place initialization code (or run-once) code here
-
+    printf("Instructions\n\rPress the push button to start. Press the bumpers to show corresponding colors. Match the pattern. If you want to delete, press the push button while releasing the bumper.\n\r");
     while( 1 ) {  
         // Place code that runs continuously in here
         // start
-        printf("");
         int8_t bmp = bumper_pressed();
+        printf("bmp: %d\n\r", bmp);
         if (bmp != -1) {
             set_LED_color((uint8_t)bmp);
-        } else if (PB_pressed()) {
-            while(1) {
-                main_game();
+        } else {
+            LED_off();
+            if (PB_pressed()) {
+                while(1) {
+                    main_game();
+                }
             }
         }
     }   
@@ -68,11 +71,18 @@ int main( void ) {    /** Main Function ****/
 void GPIO_init(void) {
     // BiLED
     GPIO_setAsOutputPin(GPIO_PORT_P6,GPIO_PIN0 | GPIO_PIN1);
+    // bumpers
+    uint8_t i;
+    for (i = 0; i < BMP_LEN; ++i) {
+        GPIO_setAsInputPinWithPullUpResistor(GPIO_PORT_P4, BMP_PINS[i]);
+    }
+    // LED
+    GPIO_setAsOutputPin(GPIO_PORT_P2,GPIO_PIN0 | GPIO_PIN1 | GPIO_PIN2);
     // PB
     GPIO_setAsInputPinWithPullDownResistor(GPIO_PORT_P5,GPIO_PIN6);
 }
 
-void Timer_Init(){
+void Timer_init(){
     config.clockSource = TIMER_A_CLOCKSOURCE_SMCLK;
     config.clockSourceDivider = TIMER_A_CLOCKSOURCE_DIVIDER_64;
     config.timerPeriod = 18750;
@@ -84,7 +94,7 @@ void Timer_Init(){
 }
 
 int8_t bumper_pressed(void) {
-    u_int8_t i = 0;
+    uint8_t i = 0;
     for (i = 0; i < BMP_LEN; ++i) {
         if (!GPIO_getInputPinValue(GPIO_PORT_P4, BMP_PINS[i])) {
             return i;
@@ -93,8 +103,9 @@ int8_t bumper_pressed(void) {
     return -1;
 }
 
-void set_LED_color(u_int8_t color) {
-    uint8_t target_COLORS[] = COLORS[color];
+
+void set_LED_color(uint8_t color) {
+    const uint8_t* target_COLORS = COLORS[color];
     if (target_COLORS[0] == 1) {
         GPIO_setOutputHighOnPin(GPIO_PORT_P2, GPIO_PIN0);
     } else {
@@ -129,7 +140,7 @@ void main_game(void) {
 
     uint8_t stage;
     bool won = true;
-    int8_t bumper_held;
+    int8_t bumper_held = -1;
 
     for(stage = 1; stage <= 10 && won == true; ++stage) {
         BiLED_red();
