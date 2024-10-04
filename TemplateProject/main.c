@@ -52,7 +52,6 @@ int main( void ) {    /** Main Function ****/
         // Place code that runs continuously in here
         // start
         int8_t bmp = bumper_pressed();
-        printf("bmp: %d\n\r", bmp);
         if (bmp != -1) {
             set_LED_color((uint8_t)bmp);
         } else {
@@ -153,6 +152,7 @@ void main_game(void) {
         }
         BiLED_green();
         counter = 0;
+        bumper_held = -1;
         uint8_t step = 0;
         while(1) {
             if (counter > 60) {
@@ -162,14 +162,18 @@ void main_game(void) {
             }
             int8_t bmp = bumper_pressed();
             if (bmp == -1) {
+                __delay_cycles(240e3); // Debounce
+                if (bumper_pressed() != bmp)
+                    continue;
                 LED_off();
                 if (bumper_held != -1) {
-                    bumper_held = -1;
                     if (PB_pressed()) {
+                        bumper_held = -1;
                         continue;
                     } else {
                         if (bumper_held == sequence[step]) {
                             ++step;
+                            counter = 0;
                             if (step == stage) {
                                 // next stage
                                 break;
@@ -180,8 +184,13 @@ void main_game(void) {
                             break;
                         }
                     }
+                    bumper_held = -1;
                 }
             } else {
+                // Debounce
+                __delay_cycles(240e3);
+                if (bumper_pressed() != bmp)
+                    continue;
                 set_LED_color((uint8_t)bmp);
                 bumper_held = bmp;
             }
@@ -189,7 +198,7 @@ void main_game(void) {
     }
     // win lose
     if (won) {
-        printf("YOU WIN!");
+        printf("YOU WIN!\r\n");
         counter = 0;
         while(!PB_pressed()) {
             if (counter > 10) {
@@ -198,9 +207,15 @@ void main_game(void) {
             } else if (counter > 5) {
                 BiLED_green();
             }
+            int8_t bmp = bumper_pressed();
+            if (bmp != -1) {
+                set_LED_color((uint8_t)bmp);
+            } else {
+                LED_off();
+            }
         }
     } else {
-        printf("INCORRECT. YOU LOSE!");
+        printf("INCORRECT. YOU LOSE!\r\n");
         counter = 0;
         while(!PB_pressed()) {
             if (counter > 10) {
@@ -208,6 +223,12 @@ void main_game(void) {
                 counter = 0;
             } else if (counter > 5) {
                 BiLED_red();
+            }
+            int8_t bmp = bumper_pressed();
+            if (bmp != -1) {
+                set_LED_color((uint8_t)bmp);
+            } else {
+                LED_off();
             }
         }
     }
